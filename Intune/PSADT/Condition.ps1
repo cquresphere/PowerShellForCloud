@@ -88,7 +88,7 @@ if ($targetprocesses.Count -eq 0) {
         if ($DeploymentType -ne 'Uninstall' -and $DeploymentType -ne 'Repair') {
             Start-Process .\Deploy-Application.exe -ArgumentList '-DeployMode NonInteractive' -ErrorAction Stop
         }
-        Elseif ($DeploymentType -eq 'Uninstall
+        Elseif ($DeploymentType -eq 'Uninstall'){
             Start-Process .\Deploy-Application.exe -ArgumentList '-DeploymentType Uninstall -DeployMode NonInteractive' -ErrorAction Stop
         }
         Else {
