@@ -44,6 +44,11 @@
 .OUTPUTS
 
 .NOTES
+  Version:        1.2
+  Author:         Karol Kula
+  Creation Date:  11.10.2023
+  Purpose/Change: Fix formatting issues and, add string validation to the ProcessToCheck parameter. 
+  
   Version:        1.0
   Author:         Karol Kula
   Creation Date:  11.10.2023
@@ -79,7 +84,16 @@ Param (
     [String]$ProcessToCheck
 )
 
-$ProcessName = "'" + $ProcessToCheck + "'"
+if($ProcessToCheck -match '"'){
+    $ProcessName = $ProcessToCheck.Replace('"','')
+    $ProcessName = "'" + $ProcessName + "'"
+}
+Elseif($ProcessToCheck -match "'"){
+    $ProcessName = $ProcessToCheck
+}
+Else{
+    $ProcessName = "'" + $ProcessToCheck + "'"
+}
 
 $targetprocesses = @(Get-WmiObject -Query "Select * FROM Win32_Process WHERE Name=$ProcessName" -ErrorAction SilentlyContinue)
 if ($targetprocesses.Count -eq 0) {
