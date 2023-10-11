@@ -1,10 +1,10 @@
 #requires -version 2
 <#
 .SYNOPSIS
-  Script is inpired by a blog article <link needed> which describes its idea and presents simplier code version.
+  The script is inspired by a blog article 'https://svdbusse.github.io/SemiAnnualChat/2019/09/14/User-Interactive-Win32-Intune-App-Deployment-with-PSAppDeployToolkit.html' which describes its idea and presents simplier code version.
 .DESCRIPTION
-  Script is used for conditional deployment option interactive if requires user's action (to save work and close interrupting processes) 
-  or noninteractive if users interaction is not needed to proceed. 
+  The script is used for conditional deployment option interactive if requires the user's action (to save work and close interrupting processes) 
+  or noninteractive if user interaction is not needed to proceed. 
 .PARAMETER -DeploymentType
     
         Specifies the deployment type Install|Uninstall|Repair
@@ -48,6 +48,7 @@
   Author:         Karol Kula
   Creation Date:  11.10.2023
   Purpose/Change: Fix formatting issues and, add string validation to the ProcessToCheck parameter. 
+  		  Insert the link reference that inspired me to create this script. 
   
   Version:        1.0
   Author:         Karol Kula
@@ -58,19 +59,19 @@
   
   powershell.exe -executionpolicy bypass -file .\Invoke64bitPS.ps1 -ScriptName "Condition.ps1" -ArgumentList "-ProcessToCheck "chrome.exe"
 
-   -Runs as 64 bit a process script Condition.ps1 to check if the process chrome.exe is running to start deploy (install) 
+   -Runs as 64-bit process script Condition.ps1 to check if the process chrome.exe is running to start deploy (install) 
 
 .EXAMPLE
 
   powershell.exe -executionpolicy bypass -file .\Invoke64bitPS.ps1 -ScriptName "Condition.ps1" -ArgumentList "-DeploymentType Uninstall -ProcessToCheck "7zFM.exe"
 
-   -Runs as 64 bit a process script Condition.ps1 to check if the process 7zFM.exe is running to start deploy (uninstall) 
+   -Runs as 64-bit process script Condition.ps1 to check if the process 7zFM.exe is running to start deployment (uninstall) 
 
 .EXAMPLE
 
   powershell.exe -executionpolicy bypass -file .\Invoke64bitPS.ps1 -ScriptName "Condition.ps1" -ArgumentList "-DeploymentType Repair -ProcessToCheck 'Code.exe' -ServiceUIFile 'ServiceUIx64.exe'"
 
-   -Runs as 64 bit a process script Condition.ps1 to check if the process Code.exe is running to start deploy (uninstall) using ServiceUIx64.exe.
+   -Runs as 64-bit process script Condition.ps1 to check if the process Code.exe is running to start deploy (uninstall) using ServiceUIx64.exe.
 #>
 
 [CmdletBinding()]
