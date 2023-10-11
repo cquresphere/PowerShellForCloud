@@ -1,0 +1,164 @@
+#requires -version 2
+<#
+.SYNOPSIS
+  
+.DESCRIPTION
+  The Script helps to find detailed information about installed applications for both system and user-level. 
+  Allows to find certain applications using attributes like:
+    -DisplayName (Default)
+    -DysplayVersion
+    -InstallLocation
+    -UninstallString
+    -InstallDate
+    -Architecture
+    -Publisher
+    -KeyName
+    -InstallContext
+
+.PARAMETER -SearchBy
+    
+        Specifies the name of the attribute used to search applications
+
+        Required?                    true
+        Position?                    0
+        Default value                DisplayName
+        Accept pipeline input?       false
+        Accept wildcard characters?  false
+
+.PARAMETER -SearchPhrase
+        Specifies the phrase used to search applications
+
+        Required?                    true
+        Position?                    1
+        Default value                
+        Accept pipeline input?       false
+        Accept wildcard characters?
+
+.PARAMETER <CommonParameters>
+        This cmdlet supports the common parameters: -Verbose, -Debug,
+        -ErrorAction, -ErrorVariable, -WarningAction, -WarningVariable,
+        -OutBuffer and -OutVariable. For more information, type
+        "get-help about_commonparameters".
+
+.INPUTS
+  <Inputs if any, otherwise state None>
+.OUTPUTS
+
+  Outputs array of PSObjects with the list of attributes:
+    -DisplayName
+    -DysplayVersion
+    -InstallLocation
+    -UninstallString
+    -InstallDate
+    -Architecture
+    -Publisher
+    -KeyName
+    -InstallContext
+
+.NOTES
+  Version:        1.0
+  Author:         Karol Kula
+  Creation Date:  09.10.2023
+  Purpose/Change: Initial script development
+
+.EXAMPLE
+  
+  Get-InstalledAppInfoByProperty -SearchPhrase *
+
+   -Searches for details about all installed applications (in user and system context, excluding UWPs).
+
+.EXAMPLE
+  
+  Get-InstalledAppInfoByProperty -SearchPhrase Notepad
+
+   -Searches for details about all installed applications (in user and system context, excluding UWPs) containing *Notepad* in DisplayName.
+
+.EXAMPLE
+
+  Get-InstalledAppInfoByProperty -SearchBy KeyName -SearchPhrase '{90BE921B-318B-323E-9AA0-53749FABBE4E}'
+
+   -Searches for details about the installed application (in user and system context, excluding UWPs) contains *{90BE921B-318B-323E-9AA0-53749FABBE4E}* in KeyName.
+
+#>
+
+function Get-InstalledAppInfoByProperty {
+    [CmdletBinding()]
+    #[OutputType([bool])]
+    Param
+    (
+        [Parameter(Mandatory = $false)]
+        [ValidateSet("KeyName", "DisplayName", "DisplayVersion", "InstallLocation", "UninstallString", "Publisher", "InstallDate", "Architecture", "InstallContext")]
+        [String] $SearchBy="DisplayName",
+        [Parameter(Mandatory = $true)]
+        [String] $SearchPhrase
+    )
+    Begin {
+        Function Search-By($SearchBy, $list, $SearchPhrase) {
+            $listToStr = $list | Where-Object { $_.DisplayName } | Select-Object DisplayName, DisplayVersion, InstallLocation, UninstallString, InstallDate, Architecture, Publisher, KeyName, InstallContext | Sort-Object DisplayName 
+            $SearchPhraseStr = "*" + $SearchPhrase + "*"
+            $Indxes = (0..($($listToStr.$SearchBy).Count - 1)) | Where-Object { $($listToStr.$SearchBy)[$_] -like $SearchPhraseStr }
+            $ResultApps = $Indxes | ForEach-Object { $listToStr[$_] }
+            Return $ResultApps
+        }   
+        $SearchPhraseValue = $SearchPhrase
+        $SearchByValue = $SearchBy
+
+        $list = @()
+        $InstalledSoftwareKeys = @(
+            "SOFTWARE\\Microsoft\\Windows\\CurrentVersion\\Uninstall",
+            "SOFTWARE\\WOW6432Node\\Microsoft\\Windows\\CurrentVersion\\Uninstall"
+        ) 
+    }
+    Process {
+        if ( -not (Test-Path -Path HKU:\)) {
+            New-PSDrive -PSProvider Registry -Name HKU -Root HKEY_USERS
+        }
+        $UsersSIDs = (Get-ChildItem -Path "HKU:\").PSChildName | Where-Object { ($_ -ne ".DEFAULT") -and ($_ -ne "S-1-5-19") -and ($_ -ne "S-1-5-20") -and ($_ -ne "S-1-5-18") -and ($_ -notlike "*_Classes") }
+        Foreach($UsersSID in $UsersSIDs){
+            $InstalledSoftwareKeys += "$UsersSID" + "\\SOFTWARE\\Microsoft\\Windows\\CurrentVersion\\Uninstall"
+            $InstalledSoftwareKeys += "$UsersSID" + "\\SOFTWARE\\WOW6432Node\\Microsoft\\Windows\\CurrentVersion\\Uninstall"
+        }
+
+        Foreach ($InstalledSoftwareKey in $InstalledSoftwareKeys) {
+            if($InstalledSoftwareKey -match 's-\d-(?:\d+-){1,14}\d+.'){
+                $strRegType = [Microsoft.Win32.RegistryHive]::'Users'
+                $InstallContext = $InstalledSoftwareKey.Split("\")[0]
+            } 
+            Else{
+                $strRegType = [Microsoft.Win32.RegistryHive]::'LocalMachine'
+                $InstallContext = 'System'
+            }
+            $InstalledSoftware = [microsoft.win32.registrykey]::OpenRemoteBaseKey($strRegType, $env:COMPUTERNAME)
+            $RegistryKey = $InstalledSoftware.OpenSubKey($InstalledSoftwareKey) 
+            if($null -eq $RegistryKey){
+                continue
+            }
+            $SubKeys = $RegistryKey.GetSubKeyNames()
+            Foreach ($key in $SubKeys) {
+                $thisKey = $InstalledSoftwareKey + "\\" + $key
+                $thisSubKey = $InstalledSoftware.OpenSubKey($thisKey)
+                $obj = New-Object PSObject
+                $obj | Add-Member -MemberType NoteProperty -Name "KeyName" -Value $key
+                $obj | Add-Member -MemberType NoteProperty -Name "DisplayName" -Value $($thisSubKey.GetValue("DisplayName"))
+                $obj | Add-Member -MemberType NoteProperty -Name "DisplayVersion" -Value $($thisSubKey.GetValue("DisplayVersion"))
+                $obj | Add-Member -MemberType NoteProperty -Name "InstallLocation" -Value $($thisSubKey.GetValue("InstallLocation"))
+                $obj | Add-Member -MemberType NoteProperty -Name "UninstallString" -Value $($thisSubKey.GetValue("UninstallString"))
+                $obj | Add-Member -MemberType NoteProperty -Name "Publisher" -Value $($thisSubKey.GetValue("Publisher"))
+                $obj | Add-Member -MemberType NoteProperty -Name "InstallDate" -Value $($thisSubKey.GetValue("InstallDate"))
+                if ($InstalledSoftwareKey -like "*WOW6432Node*") {
+                    $obj | Add-Member -MemberType NoteProperty -Name "Architecture" -Value "32-bit"
+                }
+                Else {
+                    $obj | Add-Member -MemberType NoteProperty -Name "Architecture" -Value "64-bit"
+                }                               
+                $obj | Add-Member -MemberType NoteProperty -Name "InstallContext" -Value "$InstallContext"
+                
+                $list += $obj
+            }
+        }
+        $SearchResult = Search-By -SearchBy $SearchByValue -list $list -SearchPhrase $SearchPhraseValue
+    }
+    End {
+        Return $SearchResult
+    }
+}
