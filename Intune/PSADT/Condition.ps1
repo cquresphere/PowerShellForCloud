@@ -1,7 +1,7 @@
 #requires -version 2
 <#
 .SYNOPSIS
-  The script is inspired by a blog article 'https://svdbusse.github.io/SemiAnnualChat/2019/09/14/User-Interactive-Win32-Intune-App-Deployment-with-PSAppDeployToolkit.html' which describes its idea and presents simplier code version.
+  The script is inspired by a blog article 'https://svdbusse.github.io/SemiAnnualChat/2019/09/14/User-Interactive-Win32-Intune-App-Deployment-with-PSAppDeployToolkit.html' which describes its idea and presents simpler code version.
 .DESCRIPTION
   The script is used for conditional deployment option interactive if requires the user's action (to save work and close interrupting processes) 
   or noninteractive if user interaction is not needed to proceed. 
