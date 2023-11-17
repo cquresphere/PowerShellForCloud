@@ -15,15 +15,6 @@
         Accept pipeline input?       false
         Accept wildcard characters?  false
 
-.PARAMETER -ServiceUIFile
-        Specifies the phrase used to search applications
-
-        Required?                    false
-        Position?                    1
-        Default value                ServiceUI.exe
-        Accept pipeline input?       false
-        Accept wildcard characters?
-
 .PARAMETER -ProcessToCheck
         Specifies the phrase used to search applications
 
@@ -44,6 +35,11 @@
 .OUTPUTS
 
 .NOTES
+  Version:        2.0
+  Author:         Karol Kula
+  Creation Date:  17.11.2023
+  Purpose/Change: Replacement of ServiceUI.exe with Psexec64.exe. I decided to include logging with Start-Transcript and more details with Write-Output
+  
   Version:        1.2
   Author:         Karol Kula
   Creation Date:  11.10.2023
@@ -67,11 +63,6 @@
 
    -Runs as 64-bit process script Condition.ps1 to check if the process 7zFM.exe is running to start deployment (uninstall) 
 
-.EXAMPLE
-
-  powershell.exe -executionpolicy bypass -file .\Invoke64bitPS.ps1 -ScriptName "Condition.ps1" -ArgumentList "-DeploymentType Repair -ProcessToCheck 'Code.exe' -ServiceUIFile 'ServiceUIx64.exe'"
-
-   -Runs as 64-bit process script Condition.ps1 to check if the process Code.exe is running to start deploy (uninstall) using ServiceUIx64.exe.
 #>
 
 [CmdletBinding()]
@@ -79,11 +70,11 @@ Param (
     [Parameter(Mandatory = $false)]
     [ValidateSet('Install', 'Uninstall', 'Repair')]
     [String]$DeploymentType = 'Install',
-    [Parameter(Mandatory = $false)]
-    [String]$ServiceUIFile = 'ServiceUI.exe',
     [Parameter(Mandatory = $true)]
     [String]$ProcessToCheck
 )
+
+Start-Transcript "C:\ProgramData\Microsoft\IntuneManagementExtension\Logs\Condition-$ProcessToCheck.log"
 
 if($ProcessToCheck -match '"'){
     $ProcessName = $ProcessToCheck.Replace('"','')
@@ -96,46 +87,65 @@ Else{
     $ProcessName = "'" + $ProcessToCheck + "'"
 }
 
+$LoggedOnUser = (Get-WmiObject -Class win32_computersystem).UserName
+$Is64bit = [Environment]::Is64BitProcess
+Write-Output "Is 64-bit process? $Is64bit"
+Write-Output $LoggedOnUser
+$DAppExe = Test-Path $PSScriptRoot\Deploy-Application.exe
+Write-Output "Is Deploy-Application present? $DAppExe"
+
+$ACLDAppExe = Get-ACL $PSScriptRoot\Deploy-Application.exe | Out-String
+Write-Output $ACLDAppExe
+$ExplorerSessionID = (Get-Process explorer).SessionID | Select-Object -Last 1
+Write-Output "Session ID for explorer is: $ExplorerSessionID" 
+
 $targetprocesses = @(Get-WmiObject -Query "Select * FROM Win32_Process WHERE Name=$ProcessName" -ErrorAction SilentlyContinue)
 if ($targetprocesses.Count -eq 0) {
     Try {
         Write-Output "No interrupting process is running. Starting to deploy your application without ServiceUI"
         if ($DeploymentType -ne 'Uninstall' -and $DeploymentType -ne 'Repair') {
+	    Write-Output "Trying to start deployment type install with Deploy-Application.exe in NonInteractive mode"
             Start-Process .\Deploy-Application.exe -ArgumentList '-DeployMode NonInteractive' -ErrorAction Stop
         }
         Elseif ($DeploymentType -eq 'Uninstall'){
+	    Write-Output "Trying to start deployment type uninstall with Deploy-Application.exe in NonInteractive mode"
             Start-Process .\Deploy-Application.exe -ArgumentList '-DeploymentType Uninstall -DeployMode NonInteractive' -ErrorAction Stop
         }
         Else {
-            Start-Process .\Deploy-Application.exe -ArgumentList '-DeploymentType Repair -DeployMode NonInteractive' -ErrorAction Stop 
+            Write-Output "Trying to start deployment type repair with Deploy-Application.exe in NonInteractive mode"
+	    Start-Process .\Deploy-Application.exe -ArgumentList '-DeploymentType Repair -DeployMode NonInteractive' -ErrorAction Stop 
         }
     }
     Catch {
         $ErrorMessage = $_.Exception.Message
-        $ErrorMessage
+        Write-Output $ErrorMessage
     }
 }
 else {
     Foreach ($targetprocess in $targetprocesses) {
         $ProcessOwner = $targetprocess.GetOwner().User
 	      $TargetProcessName = $targetprocess.Name
-        Write-output "Interrupting process $TargetProcessName is running by $ProcessOwner,  Starting to deploy your application with SerivuceUI"
+        Write-output "Interrupting process $TargetProcessName is running by $ProcessOwner,  Starting to deploy your application with Psexec."
     }
     Try {
         if ($DeploymentType -ne 'Uninstall' -and $DeploymentType -ne 'Repair') {
-            Start-Process .\$ServiceUIFile -ArgumentList "-Process:explorer.exe Deploy-Application.exe" -ErrorAction Stop
+             Write-Output "Trying to start deployment type install with Deploy-Application.exe in Interactive mode"
+            .\Psexec64.exe -accepteula -si $ExplorerSessionID $PSScriptRoot\Deploy-Application.exe            
         }
         Elseif ($DeploymentType -eq 'Uninstall') {
-            Start-Process .\$ServiceUIFile -ArgumentList "-Process:explorer.exe Deploy-Application.exe Uninstall" -ErrorAction Stop
+            Write-Output "Trying to start deployment type uninstall with Deploy-Application.exe in Interactive mode"
+            .\Psexec64.exe -accepteula -si $ExplorerSessionID $PSScriptRoot\Deploy-Application.exe Uninstall          
         }
         Else {
-            Start-Process .\$ServiceUIFile -ArgumentList "-Process:explorer.exe Deploy-Application.exe Repair" -ErrorAction Stop
+            Write-Output "Trying to start deployment type repair with Deploy-Application.exe in Interactive mode"
+            .\Psexec64.exe -accepteula -si $ExplorerSessionID $PSScriptRoot\Deploy-Application.exe Repair          
         }
     }
     Catch {
         $ErrorMessage = $_.Exception.Message
-        $ErrorMessage
+        Write-Output $ErrorMessage
     }
 }
 Write-Output "Install Exit Code = $LASTEXITCODE"
+Stop-Transcript
 Exit $LASTEXITCODE
