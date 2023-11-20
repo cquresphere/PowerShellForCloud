@@ -73,8 +73,8 @@ Param (
     [Parameter(Mandatory = $true)]
     [String]$ProcessToCheck
 )
-
-Start-Transcript "C:\ProgramData\Microsoft\IntuneManagementExtension\Logs\Condition-$ProcessToCheck.log"
+$DateTimeStamp = $(Get-Date -format '_HH-mm_ddMMyyyy')
+Start-Transcript "C:\ProgramData\Microsoft\IntuneManagementExtension\Logs\Condition-$($ProcessToCheck.Split('.')[0])$DateTimeStamp.log"
 
 if($ProcessToCheck -match '"'){
     $ProcessName = $ProcessToCheck.Replace('"','')
@@ -94,9 +94,7 @@ Write-Output $LoggedOnUser
 $DAppExe = Test-Path $PSScriptRoot\Deploy-Application.exe
 Write-Output "Is Deploy-Application present? $DAppExe"
 
-$ACLDAppExe = Get-ACL $PSScriptRoot\Deploy-Application.exe | Out-String
-Write-Output $ACLDAppExe
-$ExplorerSessionID = (Get-Process explorer).SessionID | Select-Object -Last 1
+$ExplorerSessionID = (Get-Process explorer -IncludeUserName | Where-Object { $_.UserName -eq $LoggedOnUser } |  Select-Object -Last 1).SessionID
 Write-Output "Session ID for explorer is: $ExplorerSessionID" 
 
 $targetprocesses = @(Get-WmiObject -Query "Select * FROM Win32_Process WHERE Name=$ProcessName" -ErrorAction SilentlyContinue)
