@@ -35,6 +35,11 @@
 .OUTPUTS
 
 .NOTES
+  Version:        2.1
+  Author:         Karol Kula
+  Creation Date:  28.11.2023
+  Purpose/Change: Adding the possibility to input more than one process into the ProcessToCheck parameter. 
+  
   Version:        2.0
   Author:         Karol Kula
   Creation Date:  17.11.2023
@@ -63,6 +68,12 @@
 
    -Runs as 64-bit process script Condition.ps1 to check if the process 7zFM.exe is running to start deployment (uninstall) 
 
+.EXAMPLE
+
+  powershell.exe -executionpolicy bypass -file .\Invoke64bitPS.ps1  -ScriptName "Condition.ps1" -Arguments "-DeploymentType Uninstall -ProcessToCheck 'Acrobat.exe,AcroRd32.exe'"
+
+   -Runs as 64-bit process script Condition.ps1 to check if the processes Acrobat.exe or AcroRd32.exe are running to start deployment (uninstall) 
+
 #>
 
 [CmdletBinding()]
@@ -76,17 +87,32 @@ Param (
 $DateTimeStamp = $(Get-Date -format '_HH-mm_ddMMyyyy')
 Start-Transcript "C:\ProgramData\Microsoft\IntuneManagementExtension\Logs\Condition-$($ProcessToCheck.Split('.')[0])$DateTimeStamp.log"
 
-if($ProcessToCheck -match '"'){
-    $ProcessName = $ProcessToCheck.Replace('"','')
-    $ProcessName = "'" + $ProcessName + "'"
-}
-Elseif($ProcessToCheck -match "'"){
-    $ProcessName = $ProcessToCheck
-}
-Else{
-    $ProcessName = "'" + $ProcessToCheck + "'"
+if ($ProcessToCheck -match ',') {
+    Write-Output "There is more than one process to check"
+    $ArrayOfProcesses = @()
+    $ArrayOfProcesses += @($ProcessToCheck.Split(','))
 }
 
+$ProcessNames = @()
+
+Foreach($item in $ArrayOfProcesses){
+    if ($item -match '"') {
+        $item = $item.Replace('"', '')
+        $ProcessNames += "'" + $item.replace(' ','') + "'"
+    }
+    Elseif ($item -match "'") {
+        $item = $item.Replace("'", '')
+        $ProcessNames += "'" + $item.replace(' ','') + "'"
+    }
+    Else {
+        $ProcessNames += "'" + $item.replace(' ','') + "'"
+    }
+}
+
+Write-Output "Current directory: $PSScriptRoot"
+if ($pwd -ne $PSScriptRoot) {
+    Set-Location $PSScriptRoot
+}
 $LoggedOnUser = (Get-WmiObject -Class win32_computersystem).UserName
 $Is64bit = [Environment]::Is64BitProcess
 Write-Output "Is 64-bit process? $Is64bit"
@@ -97,7 +123,10 @@ Write-Output "Is Deploy-Application present? $DAppExe"
 $ExplorerSessionID = (Get-Process explorer -IncludeUserName | Where-Object { $_.UserName -eq $LoggedOnUser } |  Select-Object -Last 1).SessionID
 Write-Output "Session ID for explorer is: $ExplorerSessionID" 
 
-$targetprocesses = @(Get-WmiObject -Query "Select * FROM Win32_Process WHERE Name=$ProcessName" -ErrorAction SilentlyContinue)
+$targetprocesses = @()
+Foreach ($ProcessName in $ProcessNames) {
+    $targetprocesses += @(Get-WmiObject -Query "Select * FROM Win32_Process WHERE Name=$ProcessName" -ErrorAction SilentlyContinue)
+}
 if ($targetprocesses.Count -eq 0) {
     Try {
         Write-Output "No interrupting process is running. Starting to deploy your application without ServiceUI"
