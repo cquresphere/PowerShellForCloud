@@ -92,6 +92,9 @@ if ($ProcessToCheck -match ',') {
     $ArrayOfProcesses = @()
     $ArrayOfProcesses += @($ProcessToCheck.Split(','))
 }
+Else{
+    $ArrayOfProcesses = @($ProcessToCheck)
+}
 
 $ProcessNames = @()
 
