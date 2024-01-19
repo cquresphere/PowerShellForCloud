@@ -110,10 +110,7 @@ function Get-InstalledAppInfoByProperty {
         ) 
     }
     Process {
-        if ( -not (Test-Path -Path HKU:\)) {
-            New-PSDrive -PSProvider Registry -Name HKU -Root HKEY_USERS
-        }
-        $UsersSIDs = (Get-ChildItem -Path "HKU:\").PSChildName | Where-Object { ($_ -ne ".DEFAULT") -and ($_ -ne "S-1-5-19") -and ($_ -ne "S-1-5-20") -and ($_ -ne "S-1-5-18") -and ($_ -notlike "*_Classes") }
+        $UsersSIDs = (Get-ChildItem -Path "registry::HKEY_USERS").PSChildName | Where-Object { ($_ -ne ".DEFAULT") -and ($_ -ne "S-1-5-19") -and ($_ -ne "S-1-5-20") -and ($_ -ne "S-1-5-18") -and ($_ -notlike "*_Classes") }
         Foreach($UsersSID in $UsersSIDs){
             $InstalledSoftwareKeys += "$UsersSID" + "\\SOFTWARE\\Microsoft\\Windows\\CurrentVersion\\Uninstall"
             $InstalledSoftwareKeys += "$UsersSID" + "\\SOFTWARE\\WOW6432Node\\Microsoft\\Windows\\CurrentVersion\\Uninstall"
