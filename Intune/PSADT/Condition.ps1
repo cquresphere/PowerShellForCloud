@@ -35,6 +35,11 @@
 .OUTPUTS
 
 .NOTES
+  Version:        2.2
+  Author:         Karol Kula
+  Creation Date:  03.03.2024
+  Purpose/Change: Obtain exit codes from started processes. 
+  
   Version:        2.1
   Author:         Karol Kula
   Creation Date:  28.11.2023
@@ -135,15 +140,15 @@ if ($targetprocesses.Count -eq 0) {
         Write-Output "No interrupting process is running. Starting to deploy your application without ServiceUI"
         if ($DeploymentType -ne 'Uninstall' -and $DeploymentType -ne 'Repair') {
 	    Write-Output "Trying to start deployment type install with Deploy-Application.exe in NonInteractive mode"
-            Start-Process .\Deploy-Application.exe -ArgumentList '-DeployMode NonInteractive' -ErrorAction Stop
+            $Process = Start-Process .\Deploy-Application.exe -ArgumentList '-DeployMode NonInteractive' -ErrorAction Stop -PassThru -Wait
         }
         Elseif ($DeploymentType -eq 'Uninstall'){
 	    Write-Output "Trying to start deployment type uninstall with Deploy-Application.exe in NonInteractive mode"
-            Start-Process .\Deploy-Application.exe -ArgumentList '-DeploymentType Uninstall -DeployMode NonInteractive' -ErrorAction Stop
+            $Process = Start-Process .\Deploy-Application.exe -ArgumentList '-DeploymentType Uninstall -DeployMode NonInteractive' -ErrorAction Stop -PassThru -Wait
         }
         Else {
             Write-Output "Trying to start deployment type repair with Deploy-Application.exe in NonInteractive mode"
-	    Start-Process .\Deploy-Application.exe -ArgumentList '-DeploymentType Repair -DeployMode NonInteractive' -ErrorAction Stop 
+	    $Process = Start-Process .\Deploy-Application.exe -ArgumentList '-DeploymentType Repair -DeployMode NonInteractive' -ErrorAction Stop -PassThru -Wait
         }
     }
     Catch {
@@ -154,21 +159,21 @@ if ($targetprocesses.Count -eq 0) {
 else {
     Foreach ($targetprocess in $targetprocesses) {
         $ProcessOwner = $targetprocess.GetOwner().User
-	      $TargetProcessName = $targetprocess.Name
+	$TargetProcessName = $targetprocess.Name
         Write-output "Interrupting process $TargetProcessName is running by $ProcessOwner,  Starting to deploy your application with Psexec."
     }
     Try {
         if ($DeploymentType -ne 'Uninstall' -and $DeploymentType -ne 'Repair') {
              Write-Output "Trying to start deployment type install with Deploy-Application.exe in Interactive mode"
-            .\Psexec64.exe -accepteula -si $ExplorerSessionID $PSScriptRoot\Deploy-Application.exe            
+            $Process = .\Psexec64.exe -accepteula -si $ExplorerSessionID $PSScriptRoot\Deploy-Application.exe            
         }
         Elseif ($DeploymentType -eq 'Uninstall') {
             Write-Output "Trying to start deployment type uninstall with Deploy-Application.exe in Interactive mode"
-            .\Psexec64.exe -accepteula -si $ExplorerSessionID $PSScriptRoot\Deploy-Application.exe Uninstall          
+            $Process = .\Psexec64.exe -accepteula -si $ExplorerSessionID $PSScriptRoot\Deploy-Application.exe Uninstall          
         }
         Else {
             Write-Output "Trying to start deployment type repair with Deploy-Application.exe in Interactive mode"
-            .\Psexec64.exe -accepteula -si $ExplorerSessionID $PSScriptRoot\Deploy-Application.exe Repair          
+            $Process = .\Psexec64.exe -accepteula -si $ExplorerSessionID $PSScriptRoot\Deploy-Application.exe Repair          
         }
     }
     Catch {
@@ -176,6 +181,6 @@ else {
         Write-Output $ErrorMessage
     }
 }
-Write-Output "Install Exit Code = $LASTEXITCODE"
+Write-Output "Install Exit Code = $($Process.ExitCode)"
 Stop-Transcript
-Exit $LASTEXITCODE
+Exit $($Process.ExitCode)
